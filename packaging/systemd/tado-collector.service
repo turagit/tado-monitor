@@ -1,0 +1,16 @@
+[Unit]
+Description=Tado Monitor Collector
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=tado-monitor
+Group=tado-monitor
+Type=simple
+EnvironmentFile=/etc/tado-history-dashboard/tado-collector.env
+ExecStart=/usr/local/bin/tado-collector serve
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+apiVersion: 1
+
+datasources:
+  - name: prometheus
+    uid: bedmzvj3j5pmoe
+    type: prometheus
+    access: proxy
+    url: http://localhost:8428
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+  - name: influxdb
+    uid: aedq1e0rjipdsd
+    type: influxdb
+    access: proxy
+    url: http://localhost:8086
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMode: POST
+      organization: tado-exporter
+      version: Flux
