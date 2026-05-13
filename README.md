@@ -2,6 +2,23 @@
 
 Native Rocky/RHEL 9/10 installer for a long-retention Tado dashboard.
 
+## Credit
+
+The Grafana dashboard used here is based on the original
+[tado° Dashboard](https://grafana.com/grafana/dashboards/13847-tado-dashboard/)
+published by IamTheLoki for
+[IamTheLoki/tado-exporter](https://github.com/IamTheLoki/tado-exporter).
+
+We kept the dashboard layout and Prometheus metric contract because it already
+does the important part well: rooms are discovered automatically from the `zone`
+label, and the panels give a useful room-by-room view without hardcoding a
+specific home.
+
+What this repo changes is the surrounding appliance: OAuth device-code auth
+instead of storing a Tado password, native systemd install on Rocky/RHEL,
+VictoriaMetrics for longer local history, and a Python collector that keeps the
+same dashboard metric names.
+
 The stack installs:
 
 - `tado-collector`: Python standard-library collector using Tado OAuth device-code auth.
