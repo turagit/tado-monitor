@@ -9,7 +9,11 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 
-RequestJSON = Callable[[str, str], tuple[dict[str, Any] | list[Any], dict[str, str]]]
+# NOTE: quoted so the union is not evaluated at runtime. This is a module-level
+# assignment (not an annotation), so `from __future__ import annotations` does not
+# defer it; the unquoted `dict[...] | list[...]` form crashes on Python 3.9, which
+# is the default python3 on the target Rocky/RHEL 9.
+RequestJSON = Callable[[str, str], "tuple[dict[str, Any] | list[Any], dict[str, str]]"]
 
 
 class Client:
