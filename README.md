@@ -99,6 +99,7 @@ See:
 - [Architecture](docs/architecture.md)
 - [Rate limits](docs/rate-limits.md)
 - [Backup and restore](docs/backup-restore.md)
+- [Migrate from tado-exporter + Prometheus](docs/migrate-from-tado-exporter.md)
 - [Uninstall](docs/uninstall.md)
 
 ## Development Checks
