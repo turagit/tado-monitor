@@ -12,5 +12,19 @@ ExecStart=/usr/local/bin/tado-collector serve
 Restart=always
 RestartSec=10
 
+# Sandboxing. The collector only needs outbound HTTPS to Tado and to write its
+# refreshed token under /var/lib/tado-history-dashboard.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/tado-history-dashboard
+
 [Install]
 WantedBy=multi-user.target
