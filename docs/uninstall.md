@@ -1,19 +1,25 @@
 # Uninstall
 
-Stop services:
+Stop the collector:
 
 ```bash
-sudo systemctl disable --now tado-collector victoriametrics
+sudo systemctl disable --now tado-collector
 ```
 
-Remove service files and binaries:
+Remove the collector service file and binary:
 
 ```bash
 sudo rm -f /etc/systemd/system/tado-collector.service
-sudo rm -f /etc/systemd/system/victoriametrics.service
 sudo rm -f /usr/local/bin/tado-collector
-sudo rm -f /usr/local/bin/victoria-metrics-prod
 sudo systemctl daemon-reload
+```
+
+Prometheus is installed as an RPM. Leave it in place if anything else uses it, or
+remove it with:
+
+```bash
+sudo systemctl disable --now prometheus
+sudo dnf remove -y prometheus
 ```
 
 Remove configuration and data only after confirming you no longer need history:
@@ -21,8 +27,9 @@ Remove configuration and data only after confirming you no longer need history:
 ```bash
 sudo rm -rf /etc/tado-history-dashboard
 sudo rm -rf /var/lib/tado-history-dashboard
-sudo rm -rf /var/lib/victoria-metrics
 sudo rm -rf /opt/tado-monitor
+sudo rm -f /etc/prometheus/prometheus.yml /etc/default/prometheus
+sudo rm -rf /var/lib/prometheus   # deletes all metric history
 ```
 
 Grafana is shared infrastructure. This uninstall guide leaves Grafana installed by default.

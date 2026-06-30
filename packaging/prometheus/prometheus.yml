@@ -1,0 +1,12 @@
+# Prometheus scrape config for tado-monitor.
+#
+# Prometheus scrapes the local collector's cached metrics; it never calls Tado
+# directly, so the scrape interval is independent of the Tado polling interval.
+global:
+  scrape_interval: 60s
+
+scrape_configs:
+  - job_name: tado
+    static_configs:
+      - targets:
+          - localhost:9898

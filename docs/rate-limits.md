@@ -1,6 +1,6 @@
 # Rate Limits
 
-Tado limits REST API usage. The collector therefore caches readings and exposes metrics locally instead of calling Tado for every VictoriaMetrics scrape.
+Tado limits REST API usage. The collector therefore caches readings and exposes metrics locally instead of calling Tado for every Prometheus scrape.
 
 The installer default polling interval is `15m`. You can change it in:
 
@@ -28,4 +28,4 @@ tado_collector_last_success_timestamp_seconds
 tado_collector_rate_limit_remaining
 ```
 
-Use Grafana or VictoriaMetrics queries to spot failed collection or low remaining API budget.
+Use Grafana or Prometheus queries to spot failed collection or low remaining API budget.

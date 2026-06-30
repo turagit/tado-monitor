@@ -16,13 +16,13 @@ specific home.
 
 What this repo changes is the surrounding appliance: OAuth device-code auth
 instead of storing a Tado password, native systemd install on Rocky/RHEL,
-VictoriaMetrics for longer local history, and a Python collector that keeps the
-same dashboard metric names.
+Prometheus (installed from EPEL so `dnf update` keeps it patched) for local
+history, and a Python collector that keeps the same dashboard metric names.
 
 The stack installs:
 
 - `tado-collector`: Python standard-library collector using Tado OAuth device-code auth.
-- VictoriaMetrics single-node: long-retention Prometheus-compatible storage.
+- Prometheus: long-retention local storage, installed from EPEL as a normal RPM.
 - Grafana OSS: provisioned with the captured `tado° Dashboard`.
 
 The collector never asks for or stores your Tado password. It asks you to approve access through Tado's OAuth device flow and stores the resulting token under `/var/lib/tado-history-dashboard/tokens/`.
@@ -43,12 +43,12 @@ cd tado-monitor
 sudo ./install.sh
 ```
 
-The installer detects:
+Supported on `x86_64` / `amd64` and `aarch64` / `arm64` (e.g. Apple Silicon VMs
+such as Parallels, VMware Fusion, and UTM).
 
-- `x86_64` / `amd64` for Proxmox, ESXi, VMware type-1, and most servers.
-- `aarch64` / `arm64` for Apple Silicon VMs such as Parallels, VMware Fusion, and UTM.
-
-Grafana is installed from the RPM repository. VictoriaMetrics is downloaded for the detected architecture.
+Grafana and Prometheus are both installed from RPM repositories (Grafana OSS and
+EPEL), so the host's package manager resolves the architecture and applies
+updates with `dnf update`.
 
 ## Dashboard Compatibility
 
@@ -76,7 +76,7 @@ weather_solar_intensity
 
 ```bash
 systemctl status tado-collector
-systemctl status victoriametrics
+systemctl status prometheus
 systemctl status grafana-server
 ```
 
@@ -84,22 +84,24 @@ Local endpoints:
 
 ```text
 Collector metrics: http://127.0.0.1:9898/metrics
-VictoriaMetrics:   http://127.0.0.1:8428
+Prometheus:        http://127.0.0.1:9090
 Grafana:           http://<server>:3000
 ```
 
 ## Retention and Backups
 
-The default VictoriaMetrics retention is `10y`.
+The default Prometheus retention is `10y` (set via `--storage.tsdb.retention.time`
+in `/etc/default/prometheus`).
 
-Retention is not backup. Back up `/var/lib/victoria-metrics/`, `/var/lib/tado-history-dashboard/`, and the Grafana provisioning/dashboard files if this history matters.
+Retention is not backup. Back up `/var/lib/prometheus/`, `/var/lib/tado-history-dashboard/`, and the Grafana provisioning/dashboard files if this history matters.
 
 See:
 
 - [Architecture](docs/architecture.md)
 - [Rate limits](docs/rate-limits.md)
 - [Backup and restore](docs/backup-restore.md)
-- [Migrate from tado-exporter + Prometheus](docs/migrate-from-tado-exporter.md)
+- [Migrate from tado-exporter](docs/migrate-from-tado-exporter.md)
+- [Migrate from the VictoriaMetrics build](docs/migrate-from-victoriametrics.md)
 - [Uninstall](docs/uninstall.md)
 
 ## Development Checks

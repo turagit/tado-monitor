@@ -3,10 +3,8 @@ set -Eeuo pipefail
 
 APP_NAME="tado-monitor"
 COLLECTOR_USER="tado-monitor"
-VM_USER="victoriametrics"
 DEFAULT_REPOSITORY="turagit/tado-monitor"
 DEFAULT_REF="main"
-DEFAULT_VM_VERSION="v1.103.0"
 
 normalize_arch() {
   case "${1:-}" in
@@ -62,6 +60,12 @@ detect_os() {
   supported_os "$ID" "$VERSION_ID" >/dev/null
 }
 
+os_major() {
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  echo "${VERSION_ID%%.*}"
+}
+
 install_packages() {
   log "Installing base packages"
   dnf install -y curl tar gzip shadow-utils python3 firewalld
@@ -81,6 +85,21 @@ sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 EOF
   dnf install -y grafana
+}
+
+install_prometheus() {
+  # Prometheus is installed from EPEL so it is a normal RPM that `dnf update`
+  # keeps patched. EPEL ships the Prometheus server for Rocky/RHEL 9 and 10 and
+  # resolves the correct architecture automatically (no per-arch download).
+  log "Enabling EPEL and installing Prometheus"
+  if ! rpm -q epel-release >/dev/null 2>&1; then
+    local major
+    major="$(os_major)"
+    # Rocky/Alma ship epel-release in the extras repo; RHEL needs the EPEL rpm.
+    dnf install -y epel-release \
+      || dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${major}.noarch.rpm"
+  fi
+  dnf install -y prometheus
 }
 
 ensure_user() {
@@ -122,18 +141,6 @@ EOF
   chmod 0755 /usr/local/bin/tado-collector
 }
 
-install_victoriametrics() {
-  local arch="$1"
-  local version="${VICTORIAMETRICS_VERSION:-$DEFAULT_VM_VERSION}"
-  local tmp
-  tmp="$(mktemp -d)"
-  local url="https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/${version}/victoria-metrics-linux-${arch}-${version}.tar.gz"
-  log "Installing VictoriaMetrics ${version} for ${arch}"
-  curl -fsSL "$url" -o "$tmp/victoriametrics.tar.gz"
-  tar -xzf "$tmp/victoriametrics.tar.gz" -C "$tmp"
-  install -m 0755 "$tmp/victoria-metrics-prod" /usr/local/bin/victoria-metrics-prod
-}
-
 write_config() {
   local retention="$1"
   local poll_interval="$2"
@@ -141,7 +148,6 @@ write_config() {
   install -d -m 0755 /etc/tado-history-dashboard
   install -d -m 0750 -o "$COLLECTOR_USER" -g "$COLLECTOR_USER" /var/lib/tado-history-dashboard
   install -d -m 0700 -o "$COLLECTOR_USER" -g "$COLLECTOR_USER" /var/lib/tado-history-dashboard/tokens
-  install -d -m 0750 -o "$VM_USER" -g "$VM_USER" /var/lib/victoria-metrics
 
   cat > /etc/tado-history-dashboard/tado-collector.env <<EOF
 TADO_LISTEN_ADDRESS=127.0.0.1:9898
@@ -151,18 +157,25 @@ EOF
   chmod 0640 /etc/tado-history-dashboard/tado-collector.env
   chown root:"$COLLECTOR_USER" /etc/tado-history-dashboard/tado-collector.env
 
-  cat > /etc/tado-history-dashboard/victoriametrics.env <<EOF
-VM_RETENTION_PERIOD=${retention}
+  # Prometheus scrape config (owned by the prometheus RPM, but %config(noreplace)
+  # means our copy survives package upgrades).
+  install -d -m 0755 /etc/prometheus
+  install -m 0644 "$SOURCE_DIR/packaging/prometheus/prometheus.yml" /etc/prometheus/prometheus.yml
+
+  # Prometheus runtime flags: bind to localhost only, set retention, and point
+  # the TSDB at /var/lib/prometheus/metrics2 (the EPEL data dir).
+  cat > /etc/default/prometheus <<EOF
+ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/metrics2 --storage.tsdb.retention.time=${retention} --web.listen-address=127.0.0.1:9090 --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles"
 EOF
-  chmod 0644 /etc/tado-history-dashboard/victoriametrics.env
+  chmod 0644 /etc/default/prometheus
+
+  install -d -m 0750 -o prometheus -g prometheus /var/lib/prometheus/metrics2
 }
 
 install_packaging() {
   local source_dir="$1"
   log "Installing systemd and Grafana provisioning"
   install -m 0644 "$source_dir/packaging/systemd/tado-collector.service" /etc/systemd/system/tado-collector.service
-  install -m 0644 "$source_dir/packaging/systemd/victoriametrics.service" /etc/systemd/system/victoriametrics.service
-  install -m 0644 "$source_dir/packaging/victoriametrics/scrape.yaml" /etc/tado-history-dashboard/scrape.yaml
 
   install -d -m 0755 /etc/grafana/provisioning/datasources
   install -d -m 0755 /etc/grafana/provisioning/dashboards
@@ -189,7 +202,7 @@ bootstrap_oauth() {
 enable_services() {
   log "Starting services"
   systemctl daemon-reload
-  systemctl enable --now victoriametrics.service
+  systemctl enable --now prometheus.service
   systemctl enable --now tado-collector.service
   systemctl enable --now grafana-server.service
 }
@@ -210,21 +223,21 @@ configure_firewall() {
 main() {
   require_root "$@"
   detect_os
-  local arch
-  arch="$(normalize_arch "$(uname -m)")"
+  # Architecture is validated for a clear early error, but the RPM resolves it.
+  normalize_arch "$(uname -m)" >/dev/null
   local retention
   local poll_interval
-  retention="$(prompt_default "VictoriaMetrics retention period" "10y")"
+  retention="$(prompt_default "Prometheus retention period" "10y")"
   poll_interval="$(prompt_default "Tado API polling interval" "15m")"
   local source_dir
   source_dir="$(prepare_source_dir)"
+  SOURCE_DIR="$source_dir"
 
   install_packages
   install_grafana_repo
+  install_prometheus
   ensure_user "$COLLECTOR_USER" /var/lib/tado-history-dashboard
-  ensure_user "$VM_USER" /var/lib/victoria-metrics
   install_collector "$source_dir"
-  install_victoriametrics "$arch"
   write_config "$retention" "$poll_interval"
   install_packaging "$source_dir"
   bootstrap_oauth
@@ -235,10 +248,11 @@ main() {
 
 tado-monitor is installed.
 
-Grafana:          http://$(hostname -f 2>/dev/null || hostname):3000
-VictoriaMetrics: http://127.0.0.1:8428
-Collector:       http://127.0.0.1:9898/metrics
+Grafana:     http://$(hostname -f 2>/dev/null || hostname):3000
+Prometheus:  http://127.0.0.1:9090
+Collector:   http://127.0.0.1:9898/metrics
 
+Prometheus is installed from EPEL, so 'dnf update' keeps it patched.
 Dashboard rooms populate from tado_activity_heating_power_percentage{zone="..."} labels.
 EOF
 }
