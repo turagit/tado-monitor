@@ -29,18 +29,18 @@ The collector never asks for or stores your Tado password. It asks you to approv
 
 ## Install
 
-While this repository is private, clone it with GitHub credentials:
-
-```bash
-git clone git@github.com:turagit/tado-monitor.git
-cd tado-monitor
-sudo ./install.sh
-```
-
-After the repo is public, the one-line installer will work:
+One-line install on Rocky/RHEL 9/10:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/turagit/tado-monitor/main/install.sh | sudo bash
+```
+
+Or clone and run the installer:
+
+```bash
+git clone https://github.com/turagit/tado-monitor.git
+cd tado-monitor
+sudo ./install.sh
 ```
 
 The installer detects:

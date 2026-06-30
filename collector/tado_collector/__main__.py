@@ -36,13 +36,16 @@ def main(argv: list[str] | None = None) -> int:
 
 def run_auth(cfg: config_module.Config) -> int:
     challenge = oauth.start_device_auth(cfg.client_id, cfg.authorize_url)
-    print("Open this URL in a browser and approve Tado access:")
-    print(challenge.verification_uri_complete or challenge.verification_uri)
-    print(f"User code: {challenge.user_code}")
-    print("Waiting for authorization...")
+    # flush each line: when the installer captures or pipes this output (not a
+    # TTY), Python block-buffers stdout, which would hide the device URL until
+    # the command exits — by which point the code may have expired.
+    print("Open this URL in a browser and approve Tado access:", flush=True)
+    print(challenge.verification_uri_complete or challenge.verification_uri, flush=True)
+    print(f"User code: {challenge.user_code}", flush=True)
+    print("Waiting for authorization...", flush=True)
     token = oauth.poll_device_token(challenge, cfg.client_id, cfg.token_url)
     oauth.save_token(cfg.token_file, token)
-    print(f"Token saved to {cfg.token_file}")
+    print(f"Token saved to {cfg.token_file}", flush=True)
     return 0
 
 
