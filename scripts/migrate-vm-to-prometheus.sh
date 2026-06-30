@@ -19,7 +19,11 @@
 set -Eeuo pipefail
 
 VM_ADDR="${VM_ADDR:-http://127.0.0.1:8428}"
-MATCH="${MATCH:-{__name__=~\"tado.*|weather.*\"}}"
+# Default selector: all tado/weather series. Set on its own line to avoid the
+# brace-nesting pitfall of ${MATCH:-{...}} (which doubles the closing brace).
+if [ -z "${MATCH:-}" ]; then
+  MATCH='{__name__=~"tado.*|weather.*"}'
+fi
 PROM_DATA="${PROM_DATA:-/var/lib/prometheus/metrics2}"
 PROM_USER="${PROM_USER:-prometheus}"
 
