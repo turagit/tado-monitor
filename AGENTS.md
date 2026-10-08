@@ -9,7 +9,7 @@ contract the collector keeps. Public repo; active.
 
 ## Repo map
 
-- `collector/tado_collector/` (and `collector/internal/`) — the collector;
+- `collector/tado_collector/` — the collector (`config`, `metrics`, `oauth`, `tado`);
   `collector/tado-collector` is its launcher. Metrics on `127.0.0.1:9898`.
 - `tests/` — unittest: config, metrics, OAuth, Tado client.
 - `install.sh` — one-shot installer for Rocky/RHEL (also served via
