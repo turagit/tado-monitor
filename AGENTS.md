@@ -17,7 +17,7 @@ contract the collector keeps. Public repo; active.
 - `packaging/` — `grafana/` (dashboard JSON and provisioning), `prometheus/`,
   `systemd/`.
 - `scripts/` — `test-installer.sh`, `smoke-test.sh`, `check-dashboard.py`,
-  `backup.sh`, `uninstall.sh`.
+  `backup.sh`, `uninstall.sh`, `restyle-dashboard.py` (the dashboard's house look; looks only).
 - `docs/` — `architecture.md`, `rate-limits.md`, `backup-restore.md`,
   `uninstall.md`; `docs/agents/` for issue-tracker conventions.
 
