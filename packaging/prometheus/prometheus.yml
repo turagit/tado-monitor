@@ -1,11 +1,29 @@
 # Prometheus scrape config for tado-monitor.
 #
-# Prometheus scrapes the local collector's cached metrics; it never calls Tado
-# directly, so the scrape interval is independent of the Tado polling interval.
+# Prometheus scrapes local collectors' cached metrics; it never calls Tado or a
+# device directly, so the scrape interval is independent of their polling.
 global:
   scrape_interval: 60s
 
+# Further jobs, added by hand or by companion installers on the server, live one
+# file each in /etc/prometheus/scrape.d. install.sh creates the folder and never
+# removes anything from it.
+scrape_config_files:
+  - /etc/prometheus/scrape.d/*.yml
+
+# Accept samples up to two days old: jobs that stamp a closed hour or day with
+# its start (an energy ledger, for example) deliver them up to a day late.
+storage:
+  tsdb:
+    out_of_order_time_window: 2d
+
 scrape_configs:
+  # Prometheus's own metrics
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
   - job_name: tado
     static_configs:
       - targets:

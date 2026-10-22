@@ -50,6 +50,13 @@ Grafana and Prometheus are both installed from RPM repositories (Grafana OSS and
 EPEL), so the host's package manager resolves the architecture and applies
 updates with `dnf update`.
 
+Re-running the installer is safe. It restarts Prometheus only when its config or
+flags changed, keeps the Tado token, and never removes the extra scrape jobs in
+`/etc/prometheus/scrape.d/` (one `*.yml` file each, read by `prometheus.yml`).
+It opens Grafana's port 3000 in firewalld only when you answer yes at a
+terminal; through `curl | sudo bash` or `ssh` it leaves the firewall alone. Set
+`TADO_MONITOR_FIREWALL=yes` (or `no`) to decide without being asked.
+
 ## Dashboard Compatibility
 
 The dashboard is preserved from the source system as `packaging/grafana/dashboards/tado-dashboard.json`.

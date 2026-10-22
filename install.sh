@@ -24,6 +24,35 @@ supported_os() {
   esac
 }
 
+# Install SRC to DST and say whether DST changed, so a re-run restarts only what it changed
+# (systemctl enable --now leaves a running service on its old files).
+install_tracked() {
+  local src="$1" dst="$2" mode="${3:-0644}" before=""
+  [[ -e "$dst" ]] && before="$(cksum < "$dst")"
+  install -m "$mode" "$src" "$dst"
+  if [[ "$before" == "$(cksum < "$dst")" ]]; then echo "same"; else echo "changed"; fi
+}
+
+# The firewall prompt's default: open the port when asked at a terminal; without one (curl | sudo bash,
+# a run over ssh) leave the firewall alone. TADO_MONITOR_FIREWALL=yes or no decides without asking.
+firewall_default() {
+  case "${TADO_MONITOR_FIREWALL:-}" in
+    yes|y) echo "y"; return ;;
+    no|n) echo "n"; return ;;
+  esac
+  if [[ -t 0 ]]; then echo "y"; else echo "n"; fi
+}
+
+if [[ "${1:-}" == "--test-install-tracked" ]]; then
+  install_tracked "$2" "$3"
+  exit $?
+fi
+
+if [[ "${1:-}" == "--test-firewall-default" ]]; then
+  firewall_default
+  exit $?
+fi
+
 if [[ "${1:-}" == "--test-normalize-arch" ]]; then
   normalize_arch "$2"
   exit $?
@@ -158,16 +187,25 @@ EOF
   chown root:"$COLLECTOR_USER" /etc/tado-history-dashboard/tado-collector.env
 
   # Prometheus scrape config (owned by the prometheus RPM, but %config(noreplace)
-  # means our copy survives package upgrades).
-  install -d -m 0755 /etc/prometheus
-  install -m 0644 "$SOURCE_DIR/packaging/prometheus/prometheus.yml" /etc/prometheus/prometheus.yml
+  # means our copy survives package upgrades). Further jobs, added by hand or by
+  # companion installers, live one file each in scrape.d, which prometheus.yml
+  # reads and a re-run never empties.
+  install -d -m 0755 /etc/prometheus /etc/prometheus/scrape.d
+  if [[ "$(install_tracked "$SOURCE_DIR/packaging/prometheus/prometheus.yml" /etc/prometheus/prometheus.yml)" == "changed" ]]; then
+    RESTART_UNITS+=(prometheus.service)
+  fi
 
   # Prometheus runtime flags: bind to localhost only, set retention, and point
   # the TSDB at /var/lib/prometheus/metrics2 (the EPEL data dir).
-  cat > /etc/default/prometheus <<EOF
+  local defaults
+  defaults="$(mktemp)"
+  cat > "$defaults" <<EOF
 ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/metrics2 --storage.tsdb.retention.time=${retention} --web.listen-address=127.0.0.1:9090 --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles"
 EOF
-  chmod 0644 /etc/default/prometheus
+  if [[ "$(install_tracked "$defaults" /etc/default/prometheus 0644)" == "changed" ]]; then
+    RESTART_UNITS+=(prometheus.service)
+  fi
+  rm -f "$defaults"
 
   install -d -m 0750 -o prometheus -g prometheus /var/lib/prometheus/metrics2
 }
@@ -205,6 +243,12 @@ enable_services() {
   systemctl enable --now prometheus.service
   systemctl enable --now tado-collector.service
   systemctl enable --now grafana-server.service
+  # enable --now leaves a running service on its old files: restart what this run changed
+  local unit
+  for unit in $(printf '%s\n' "${RESTART_UNITS[@]+"${RESTART_UNITS[@]}"}" | sort -u); do
+    log "Restarting $unit (its files changed)"
+    systemctl restart "$unit"
+  done
 }
 
 configure_firewall() {
@@ -212,7 +256,7 @@ configure_firewall() {
     return
   fi
   local answer
-  answer="$(prompt_default "Open Grafana port 3000/tcp in firewalld?" "y")"
+  answer="$(prompt_default "Open Grafana port 3000/tcp in firewalld?" "$(firewall_default)")"
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     systemctl enable --now firewalld || true
     firewall-cmd --add-port=3000/tcp --permanent
@@ -232,6 +276,7 @@ main() {
   local source_dir
   source_dir="$(prepare_source_dir)"
   SOURCE_DIR="$source_dir"
+  RESTART_UNITS=()
 
   install_packages
   install_grafana_repo
