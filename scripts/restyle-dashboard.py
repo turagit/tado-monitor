@@ -9,6 +9,7 @@ metric contract (scripts/check-dashboard.py) still holds. Running it twice chang
   boiler's red, humidity water blue, outside temperature in ink; the all-zones charts keep a colour per room;
 - comfort bands in status colours only (cold, comfortable, warm, hot; dry, comfortable, humid);
 - open windows: closed muted, opened in the warning colour;
+- heating power named for what it is, a demand in percent, so it never reads as a target temperature;
 - night (22:00 to 07:00, Europe/Amsterdam) shaded on the curves, as on the HUD's day curve.
 
     python3 scripts/restyle-dashboard.py [DASHBOARD.json]
@@ -28,6 +29,12 @@ NIGHT_SHADE = "rgba(120, 140, 190, 0.07)"
 TEMP_BANDS = [(None, WATER), (19, OK), (25, WARN), (30, BAD)]     # cold, comfortable, warm, hot
 HUMIDITY_BANDS = [(None, WARN), (40, OK), (70, WATER)]           # dry, comfortable, humid
 HEATING = [(None, INK3), (1, RED)]                               # off, heating
+# tado's heating power is a demand (0-100 %), not a temperature: next to the app's "Heating to 21.0°" a dial
+# titled "Heating Power" showing 16 read as a target of 16° (2026-10-22). Call it what it is.
+DEMAND_TITLES = {"Heating Power": "Heating demand", "Heatingpower: $zone": "Heating demand: $zone",
+                 "Heatingpower: All Zones": "Heating demand: All Zones"}
+DEMAND_NOTE = ("How hard tado is heating, 0-100 % (tado's heating power): not a temperature. "
+               "The target is Set Temperature.")
 
 
 def fixed(c):
@@ -63,6 +70,9 @@ def restyle(d):
         defaults = p.setdefault("fieldConfig", {}).setdefault("defaults", {})
         unit = defaults.get("unit")
         title = p.get("title") or ""
+        if unit == "percent" and any("heating_power" in t.get("expr", "") for t in p.get("targets", [])):
+            title = p["title"] = DEMAND_TITLES.get(title, title)
+            p["description"] = DEMAND_NOTE
         if kind == "text":
             opts = p.get("options", {})
             label = "Temperature" if "Temperature" in opts.get("content", "") else "Humidity"
